@@ -29,18 +29,8 @@ void gcpRegister(SfM_Data & sfm_data)
 {
   if (sfm_data.control_points.size() < 3)
   {
+    std::cout << "Not enough control points (min. 3 required).\n\n";
     return;
-  }
-
-  // Assert that control points can be triangulated
-  for (Landmarks::const_iterator iterL = sfm_data.control_points.begin();
-    iterL != sfm_data.control_points.end(); ++iterL)
-  {
-    if (iterL->second.obs.size() < 2)
-    {
-      // "Each control point must be defined in at least 2 pictures."); TODO - handle this during registration/triangulation, skip gpc with less thad 2 obs
-      return;
-    }
   }
 
   //---
@@ -60,6 +50,7 @@ void gcpRegister(SfM_Data & sfm_data)
 
     if (obs.size() < 2)
     {
+        std::cout << "Control point must be defined in at least 2 pictures. Skipping.\n\n";
         continue;
     }
 
@@ -85,7 +76,7 @@ void gcpRegister(SfM_Data & sfm_data)
     Vec4 Xhomogeneous;
     if (!TriangulateNViewAlgebraic(bearing_matrix, poses, &Xhomogeneous))
     {
-      std::cout << "Invalid triangulation" << std::endl;
+      std::cout << "Invalid triangulation.\n\n";
       return;
     }
 
@@ -123,7 +114,7 @@ void gcpRegister(SfM_Data & sfm_data)
 
   if (map_control_points.size() < 3)
   {
-    // msgBox.setText("Insufficient number of triangulated control points.");
+    std::cout << "Insufficient number of triangulated control points.\n\n";
     return;
   }
 
@@ -158,7 +149,6 @@ void gcpRegister(SfM_Data & sfm_data)
         << " rotation:\n" << R << "\n"
         << " translation: "<< t.transpose() << std::endl;
 
-
       //--
       // Apply the found transformation as a 3D Similarity transformation matrix // S * R * X + t
       //--
@@ -173,9 +163,9 @@ void gcpRegister(SfM_Data & sfm_data)
       {
         if (iterL->second.obs.size() < 2)
         {
-            // "Each control point must be defined in at least 2 pictures."); TODO - handle this during registration/triangulation, skip gpc with less thad 2 obs
             continue;
         }
+
         const IndexT CPIndex = iterL->first;
         // If the control point has not been used, continue...
         if (map_triangulation_errors.find(CPIndex) == map_triangulation_errors.end())
@@ -188,12 +178,10 @@ void gcpRegister(SfM_Data & sfm_data)
           << (sim(map_triangulated[CPIndex]) - map_control_points[CPIndex]).norm() << " user unit(s)"<< "\n\n";
       }
       std::cout << os.str();
-
-    //   msgBox.setText(QString::fromStdString(string_pattern_replace(os.str(), "\n", "<br>")));
     }
     else
     {
-    //   msgBox.setText("Registration failed. Please check your Control Points coordinates.");
+      std::cout << "Registration failed. Please check your Control Points coordinates.\n\n";
     }
   }
 
@@ -216,17 +204,17 @@ void gcpRegister(SfM_Data & sfm_data)
         )
       )
     {
-    //   msgBox.setText("BA with GCP failed.");
+     std::cout << "BA with GCP failed." << std::endl;
     }
   }
 }
 
 bool readMarkersPositions(const std::string & sFileName, Landmarks & landmarks)
 {
-    // Costruire gia' i landmarks con i punti 3d, leggendoli dai file di markers
-    // open markers positions file
-    // for each line
-    //  landmarks[id_marker].X = x,y,z
+    //---
+    // - reads markers positions from file
+    // - creates landmarks with empty observations
+    //---
 
     std::ifstream in(sFileName);
 
@@ -273,7 +261,7 @@ int main(int argc, char **argv)
 
     // required
     cmd.add( make_option('i', sSfM_Data_Filename, "input_file") );
-    cmd.add( make_option('m', sMarkers_Positions_Filename, "input_file") );
+    cmd.add( make_option('m', sMarkers_Positions_Filename, "markers_positions_file") );
     cmd.add( make_option('o', sOutDir, "outdir") );
 
     try {
@@ -284,7 +272,7 @@ int main(int argc, char **argv)
             << "Usage: " << argv[0] << '\n'
             << "[-i|--input_file] a SfM_Data file \n"
             << "[-o|--outdir path] \n"            
-            << "[-m|--markers_position_file] a text file with id,x,y,z for each marker \n";
+            << "[-m|--markers_positions_file] a text file with id x y z for each marker \n";
 
         OPENMVG_LOG_ERROR << s;
         return EXIT_FAILURE;
@@ -295,7 +283,7 @@ int main(int argc, char **argv)
         << argv[0] << "\n"
         << "--input_file " << sSfM_Data_Filename << "\n"
         << "--outdir " << sOutDir << "\n"
-        << "--markers_position_file " << sMarkers_Positions_Filename << "\n";
+        << "--markers_positions_file " << sMarkers_Positions_Filename << "\n";
 
     // Create output dir
     if (!stlplus::folder_exists(sOutDir))
@@ -346,8 +334,11 @@ int main(int argc, char **argv)
 
         for (int j = 0; j < markerIds.size(); j++)
         {
-            Vec2 firstCorner = Vec2(markerCorners[j][0].x, markerCorners[j][0].y);
-            landmarks[markerIds[j]].obs[view->id_view] = Observation(firstCorner, 0);
+            if (landmarks.find(markerIds[j]) != landmarks.end())
+            {
+              Vec2 firstCorner = Vec2(markerCorners[j][0].x, markerCorners[j][0].y);
+              landmarks[markerIds[j]].obs[view->id_view] = Observation(firstCorner, 0);
+            }
         }
     }
 
@@ -368,7 +359,82 @@ int main(int argc, char **argv)
        stlplus::create_filespec(sOutDir, "sfm_data_reg", ".ply"),
        ESfM_Data(ALL));
 
+    //-- Export scene extrinsics to disk
+    OPENMVG_LOG_INFO << "...Export SfM_Data to disk (extrinsics only).";
+    Save(sfm_data,
+       stlplus::create_filespec(sOutDir, "sfm_data_camera_poses", ".json"),
+       ESfM_Data(EXTRINSICS));
+
     //-------------------------------------------------------------------------
     // d. Triangulate position of unknown markers and export them in a txt file
     //-------------------------------------------------------------------------
+    dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+
+    markerIds.clear();
+    markerCorners.clear();
+
+    Hash_Map<IndexT, Observations> markersObservations;
+
+    for (int i = 0; i < static_cast<int>(sfm_data.views.size()); ++i)
+    {        
+        Views::const_iterator iterViews = sfm_data.views.begin();
+        std::advance(iterViews, i);
+        const View * view = iterViews->second.get();
+
+        if (!sfm_data.IsPoseAndIntrinsicDefined(view))
+            continue;
+
+        const std::string sView_filename = stlplus::create_filespec(sfm_data.s_root_path, view->s_Img_path);
+
+        image = cv::imread(sView_filename);
+        
+        cv::aruco::detectMarkers(image, dictionary, markerCorners, markerIds);
+
+        for (int j = 0; j < markerIds.size(); j++)
+        {
+            Vec2 firstCorner = Vec2(markerCorners[j][0].x, markerCorners[j][0].y);
+            markersObservations[markerIds[j]][view->id_view] = Observation(firstCorner, view->id_view);
+        }
+
+        cv::aruco::drawDetectedMarkers(image, markerCorners, markerIds);
+
+        cv::imwrite(stlplus::create_filespec(sOutDir, view->s_Img_path), image); // just for Debug
+    }
+
+    SfM_Data_Structure_Computation_Robust triangulation(2.0); // 2.0 pixels of max reproj error
+
+    Hash_Map<IndexT, Vec3> markers;
+
+    for (auto const& x : markersObservations)
+    {
+        auto observations = x.second;
+
+        Landmark landmark;
+
+        bool result = triangulation.robust_triangulation(sfm_data, observations, landmark); 
+
+        if (result)
+        {
+          markers[x.first] = Vec3(landmark.X.x(), landmark.X.y(), landmark.X.z());
+        }
+    }
+
+    std::string sFileName(stlplus::create_filespec(sOutDir, "detected_markers", ".txt"));
+
+    std::ofstream outputFile(sFileName);
+    
+    if (!outputFile)
+    {
+        OPENMVG_LOG_ERROR
+            << "loadPairs: Impossible to read the specified file: \"" << sFileName << "\".";
+        return false;
+    }
+
+    for (int i = 0; i < static_cast<int>(sfm_data.views.size()); ++i)
+    {
+      if (markers.find(i) != markers.end())
+      {
+        outputFile << i << " " << markers[i].x() << " " << markers[i].y() << " " << markers[i].z() << std::endl;
+      }
+    }
 }
