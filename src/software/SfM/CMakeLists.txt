@@ -144,6 +144,16 @@ target_link_libraries(openMVG_main_MatchesToTracks
     ${STLPLUS_LIBRARY}
 )
 
+add_executable(openMVG_main_ScaleTestField main_ScaleTestField.cpp)
+target_link_libraries(openMVG_main_ScaleTestField
+  openMVG_system
+  openMVG_image
+  openMVG_sfm
+  ${STLPLUS_LIBRARY}
+  ${OpenCV_LIBS}
+)
+target_include_directories(openMVG_main_ScaleTestField PRIVATE ${OpenCV_INCLUDE_DIRS})
+
 # Installation rules
 set_property( TARGET openMVG_main_ListMatchingPairs PROPERTY FOLDER OpenMVG/software )
 set_property( TARGET openMVG_main_ComputeFeatures   PROPERTY FOLDER OpenMVG/software )
@@ -152,6 +162,7 @@ set_property( TARGET openMVG_main_ComputeVLAD       PROPERTY FOLDER OpenMVG/soft
 set_property( TARGET openMVG_main_ComputeMatches    PROPERTY FOLDER OpenMVG/software )
 set_property( TARGET openMVG_main_GeometricFilter   PROPERTY FOLDER OpenMVG/software )
 set_property( TARGET openMVG_main_MatchesToTracks   PROPERTY FOLDER OpenMVG/software )
+set_property( TARGET openMVG_main_ScaleTestField    PROPERTY FOLDER OpenMVG/software )
 
 install( TARGETS openMVG_main_ListMatchingPairs DESTINATION bin/ )
 install( TARGETS openMVG_main_ComputeFeatures   DESTINATION bin/ )
@@ -160,6 +171,7 @@ install( TARGETS openMVG_main_ComputeVLAD       DESTINATION bin/ )
 install( TARGETS openMVG_main_ComputeMatches    DESTINATION bin/ )
 install( TARGETS openMVG_main_GeometricFilter   DESTINATION bin/ )
 install( TARGETS openMVG_main_MatchesToTracks   DESTINATION bin/ )
+install( TARGETS openMVG_main_ScaleTestField    DESTINATION bin/ )
 
 ###
 # SfM Pipelines & SfM Data format tools, ...
