@@ -380,7 +380,7 @@ int main(int argc, char **argv)
     OPENMVG_LOG_INFO << "...Export SfM_Data to disk (extrinsics only).";
     Save(sfm_data,
        stlplus::create_filespec(sOutDir, "sfm_data_camera_poses", ".json"),
-       ESfM_Data(EXTRINSICS));
+       ESfM_Data(INTRINSICS | EXTRINSICS));
 
     //-------------------------------------------------------------------------
     // d. Triangulate position of unknown markers and export them in a txt file
@@ -449,21 +449,39 @@ int main(int argc, char **argv)
         }
     }
 
-    std::string sFileName(stlplus::create_filespec(sOutDir, "detected_markers", ".txt"));
+    std::string sCalibrationMarkersFileName(stlplus::create_filespec(sOutDir, "calibration_markers", ".txt"));
 
-    std::ofstream outputFile(sFileName);
+    std::ofstream calibrationMarkersOutputFile(sCalibrationMarkersFileName);
     
-    if (!outputFile)
+    if (!calibrationMarkersOutputFile)
     {
         OPENMVG_LOG_ERROR
-            << "loadPairs: Impossible to read the specified file: \"" << sFileName << "\".";
+            << "Impossible to read the specified file: \"" << sCalibrationMarkersFileName << "\".";
+        return false;
+    }
+
+    std::string sDetectedMarkersFileName(stlplus::create_filespec(sOutDir, "detected_markers", ".txt"));
+
+    std::ofstream detectedMarkersOutputFile(sDetectedMarkersFileName);
+    
+    if (!detectedMarkersOutputFile)
+    {
+        OPENMVG_LOG_ERROR
+            << "Impossible to read the specified file: \"" << sDetectedMarkersFileName << "\".";
         return false;
     }
 
     for (auto const& x : markers)
     {
       double id = x.first / 10000.0;
-      
-      outputFile << std::setprecision(4) << std::fixed << id << " " << x.second.x() << " " << x.second.y() << " " << x.second.z() << std::endl;
+
+      if (landmarks.find(x.first) != landmarks.end())
+      {
+        calibrationMarkersOutputFile << std::setprecision(4) << std::fixed << id << " " << x.second.x() << " " << x.second.y() << " " << x.second.z() << std::endl;  
+      }
+      else
+      {
+        detectedMarkersOutputFile << std::setprecision(4) << std::fixed << id << " " << x.second.x() << " " << x.second.y() << " " << x.second.z() << std::endl;
+      }      
     }
 }
