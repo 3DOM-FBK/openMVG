@@ -390,6 +390,7 @@ int main(int argc, char **argv)
     markerIds.clear();
     markerCorners.clear();
 
+    // Detect all corners of all the markers
     Hash_Map<IndexT, Observations> markersObservations;
 
     for (int i = 0; i < static_cast<int>(sfm_data.views.size()); ++i)
@@ -409,8 +410,19 @@ int main(int argc, char **argv)
 
         for (int j = 0; j < markerIds.size(); j++)
         {
+            int markerId = markerIds[j] * 10000 + 1000;
+
             Vec2 firstCorner = Vec2(markerCorners[j][0].x, markerCorners[j][0].y);
-            markersObservations[markerIds[j]][view->id_view] = Observation(firstCorner, view->id_view);
+            markersObservations[markerId][view->id_view] = Observation(firstCorner, 0);
+
+            Vec2 secondCorner = Vec2(markerCorners[j][1].x, markerCorners[j][1].y);
+            markersObservations[markerId + 1000][view->id_view] = Observation(secondCorner, 0);
+
+            Vec2 thirdCorner = Vec2(markerCorners[j][2].x, markerCorners[j][2].y);
+            markersObservations[markerId + 2000][view->id_view] = Observation(thirdCorner, 0);
+
+            Vec2 fourthCorner = Vec2(markerCorners[j][3].x, markerCorners[j][3].y);
+            markersObservations[markerId + 3000][view->id_view] = Observation(fourthCorner, 0);
         }
 
         cv::aruco::drawDetectedMarkers(image, markerCorners, markerIds);
@@ -418,6 +430,7 @@ int main(int argc, char **argv)
         cv::imwrite(stlplus::create_filespec(sOutDir, view->s_Img_path), image); // just for Debug
     }
 
+    // Detected corners triangulation
     SfM_Data_Structure_Computation_Robust triangulation(2.0); // 2.0 pixels of max reproj error
 
     Hash_Map<IndexT, Vec3> markers;
@@ -447,11 +460,10 @@ int main(int argc, char **argv)
         return false;
     }
 
-    for (int i = 0; i < static_cast<int>(sfm_data.views.size()); ++i)
+    for (auto const& x : markers)
     {
-      if (markers.find(i) != markers.end())
-      {
-        outputFile << i << " " << markers[i].x() << " " << markers[i].y() << " " << markers[i].z() << std::endl;
-      }
+      double id = x.first / 10000.0;
+      
+      outputFile << std::setprecision(4) << std::fixed << id << " " << x.second.x() << " " << x.second.y() << " " << x.second.z() << std::endl;
     }
 }
