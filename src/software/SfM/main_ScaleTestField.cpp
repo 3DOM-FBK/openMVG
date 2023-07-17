@@ -234,7 +234,7 @@ bool readMarkersPositions(const std::string & sFileName, Landmarks & landmarks)
     while (std::getline( in, sValue ) )
     {
         vec_str.clear();
-        stl::split(sValue, ' ', vec_str);
+        stl::split(sValue, ' ', vec_str); // 48.1000 5.0000 415.0000 0
 
         const IndexT str_size (vec_str.size());
         if (str_size < 4) // marker_id x y z
@@ -243,7 +243,9 @@ bool readMarkersPositions(const std::string & sFileName, Landmarks & landmarks)
             continue;
         }
 
-        int markerId = std::stoi(vec_str[0]); // marker ID must be the exact Aruco Marker ID of the specified dictionary
+        std::vector<std::string> id_str;
+        stl::split(vec_str[0], '.', id_str);
+        int markerId = std::stoi(id_str[0]) * 10000 + std::stoi(id_str[1]); // marker ID must be the exact Aruco Marker ID of the specified dictionary
 
         float x = std::stof(vec_str[1]);
         float y = std::stof(vec_str[2]);
@@ -338,10 +340,21 @@ int main(int argc, char **argv)
 
         for (int j = 0; j < markerIds.size(); j++)
         {
-            if (landmarks.find(markerIds[j]) != landmarks.end())
+            int markerId = markerIds[j] * 10000 + 1000;
+            
+            if (landmarks.find(markerId) != landmarks.end())
             {
               Vec2 firstCorner = Vec2(markerCorners[j][0].x, markerCorners[j][0].y);
-              landmarks[markerIds[j]].obs[view->id_view] = Observation(firstCorner, 0);
+              landmarks[markerId].obs[view->id_view] = Observation(firstCorner, 0);
+
+              Vec2 secondCorner = Vec2(markerCorners[j][1].x, markerCorners[j][1].y);
+              landmarks[markerId + 1000].obs[view->id_view] = Observation(secondCorner, 0);
+
+              Vec2 thirdCorner = Vec2(markerCorners[j][2].x, markerCorners[j][2].y);
+              landmarks[markerId + 2000].obs[view->id_view] = Observation(thirdCorner, 0);
+
+              Vec2 fourthCorner = Vec2(markerCorners[j][3].x, markerCorners[j][3].y);
+              landmarks[markerId + 3000].obs[view->id_view] = Observation(fourthCorner, 0);
             }
         }
     }
