@@ -25,8 +25,14 @@ using namespace openMVG::image;
 using namespace openMVG::cameras;
 using namespace openMVG::sfm;
 
+
 void gcpRegister(SfM_Data & sfm_data)
 {
+  //---
+  // - given an SfM data file with GCPs, does the rotation/scale/translation
+  // - the input file is updated in-place and all the extrinsic parameters are updated
+  //---
+  
   if (sfm_data.control_points.size() < 3)
   {
     std::cout << "Not enough control points (min. 3 required).\n\n";
@@ -207,7 +213,7 @@ void gcpRegister(SfM_Data & sfm_data)
           )
         )
       {
-      std::cout << "BA with GCP failed." << std::endl;
+        std::cout << "BA with GCP failed." << std::endl;
       }
     }
   }
@@ -311,6 +317,7 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
+    // Init Aruco marker detection dictionary
     auto dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_7X7_250);
 
     cv::Mat image;
@@ -323,6 +330,7 @@ int main(int argc, char **argv)
     Landmarks landmarks;
     readMarkersPositions(sMarkers_Positions_Filename, landmarks);
 
+    // Detect markers in each image
     for (int i = 0; i < static_cast<int>(sfm_data.views.size()); ++i)
     {        
         Views::const_iterator iterViews = sfm_data.views.begin();
@@ -338,6 +346,7 @@ int main(int argc, char **argv)
         
         cv::aruco::detectMarkers(image, dictionary, markerCorners, markerIds);
 
+        // Add detected corners to landmarks (CP) observations
         for (int j = 0; j < markerIds.size(); j++)
         {
             int markerId = markerIds[j] * 10000 + 1000;
@@ -359,8 +368,10 @@ int main(int argc, char **argv)
         }
     }
 
+    // Insert control points in the sfm_data file
     sfm_data.control_points = landmarks;    
 
+    // Just for debug
     Save(sfm_data,
        stlplus::create_filespec(sOutDir, "sfm_data_cp", ".json"),
        ESfM_Data(ALL));
@@ -377,10 +388,10 @@ int main(int argc, char **argv)
        ESfM_Data(ALL));
 
     //-- Export scene extrinsics to disk
-    OPENMVG_LOG_INFO << "...Export SfM_Data to disk (extrinsics only).";
+    OPENMVG_LOG_INFO << "...Export SfM_Data to disk (without GCPs).";
     Save(sfm_data,
        stlplus::create_filespec(sOutDir, "sfm_data_camera_poses", ".json"),
-       ESfM_Data(INTRINSICS | EXTRINSICS));
+       ESfM_Data(VIEWS | INTRINSICS | EXTRINSICS));
 
     //-------------------------------------------------------------------------
     // d. Triangulate position of unknown markers and export them in a txt file
@@ -393,6 +404,7 @@ int main(int argc, char **argv)
     // Detect all corners of all the markers
     Hash_Map<IndexT, Observations> markersObservations;
 
+    // Detect markers in each image
     for (int i = 0; i < static_cast<int>(sfm_data.views.size()); ++i)
     {        
         Views::const_iterator iterViews = sfm_data.views.begin();
@@ -425,9 +437,9 @@ int main(int argc, char **argv)
             markersObservations[markerId + 3000][view->id_view] = Observation(fourthCorner, 0);
         }
 
+        // Just for Debug
         cv::aruco::drawDetectedMarkers(image, markerCorners, markerIds);
-
-        cv::imwrite(stlplus::create_filespec(sOutDir, view->s_Img_path), image); // just for Debug
+        cv::imwrite(stlplus::create_filespec(sOutDir, view->s_Img_path), image);
     }
 
     // Detected corners triangulation
@@ -435,6 +447,7 @@ int main(int argc, char **argv)
 
     Hash_Map<IndexT, Vec3> markers;
 
+    // Triangulate the position of all the markers (A3 and test field)
     for (auto const& x : markersObservations)
     {
         auto observations = x.second;
@@ -452,7 +465,7 @@ int main(int argc, char **argv)
     std::string sCalibrationMarkersFileName(stlplus::create_filespec(sOutDir, "calibration_markers", ".txt"));
 
     std::ofstream calibrationMarkersOutputFile(sCalibrationMarkersFileName);
-    
+        
     if (!calibrationMarkersOutputFile)
     {
         OPENMVG_LOG_ERROR
@@ -477,11 +490,13 @@ int main(int argc, char **argv)
 
       if (landmarks.find(x.first) != landmarks.end())
       {
-        calibrationMarkersOutputFile << std::setprecision(4) << std::fixed << id << " " << x.second.x() << " " << x.second.y() << " " << x.second.z() << std::endl;  
+        // Save triangulated positions A3
+        calibrationMarkersOutputFile << std::setprecision(4) << std::fixed << id << " " << std::setprecision(6) << std::fixed << x.second.x() << " " << x.second.y() << " " << x.second.z() << std::endl;  
       }
       else
       {
-        detectedMarkersOutputFile << std::setprecision(4) << std::fixed << id << " " << x.second.x() << " " << x.second.y() << " " << x.second.z() << std::endl;
+        // Save triangulated positions Test Field
+        detectedMarkersOutputFile << std::setprecision(4) << std::fixed << id << " " << std::setprecision(6) << std::fixed << x.second.x() << " " << x.second.y() << " " << x.second.z() << std::endl;
       }      
     }
 }
