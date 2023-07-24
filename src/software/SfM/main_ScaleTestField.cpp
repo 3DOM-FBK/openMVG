@@ -484,12 +484,32 @@ int main(int argc, char **argv)
         return false;
     }
 
+    std::string sComparisonFileName(stlplus::create_filespec(sOutDir, "comparison", ".txt"));
+
+    std::ofstream comparisonOutputFile(sComparisonFileName);
+    
+    if (!comparisonOutputFile)
+    {
+        OPENMVG_LOG_ERROR
+            << "Impossible to read the specified file: \"" << sComparisonFileName << "\".";
+        return false;
+    }
+
     for (auto const& x : markers)
     {
       double id = x.first / 10000.0;
 
       if (landmarks.find(x.first) != landmarks.end())
       {
+        float dx = landmarks[x.first].X.x() - x.second.x();
+        float dy = landmarks[x.first].X.y() - x.second.y();
+        float dz = landmarks[x.first].X.z() - x.second.z();
+
+        comparisonOutputFile << std::setprecision(4) << std::fixed << id << " " <<  std::setprecision(6) << std::fixed << 
+          landmarks[x.first].X.x() << " " << landmarks[x.first].X.y() << " " << landmarks[x.first].X.z() << " " <<
+          x.second.x() << " " << x.second.y() << " " << x.second.z() << " " <<
+          dx << " " << dy << " " << dz << std::endl;
+
         // Save triangulated positions A3
         calibrationMarkersOutputFile << std::setprecision(4) << std::fixed << id << " " << std::setprecision(6) << std::fixed << x.second.x() << " " << x.second.y() << " " << x.second.z() << std::endl;  
       }
